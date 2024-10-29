@@ -13,3 +13,5 @@ app.use('/api', routes);
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost:${port}`);
 });
+
+app.use('/uploads', express.static(__dirname + '/uploads'));

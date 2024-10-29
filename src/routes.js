@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const db = require('./db');
 
 // listar todas as vagas
@@ -12,24 +13,6 @@ router.get('/vagas', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// adicionar nova vaga
-/*router.post('/vagas', async (req, res) => {
-  const { titulo, descricao, requisitos, dataPublicacao, administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa} = req.body;
-  console.log('Dados recebidos:', req.body);
-  try {
-    await db.query(
-      'INSERT INTO vagas (titulo, descricao, requisitos, dataPublicacao, administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [titulo, descricao, requisitos, dataPublicacao,  administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa]
-    );
-    console.log('Consulta executada com sucesso!');
-    res.status(201).json({ message: 'Vaga inserida com sucesso!' });
-  } 
-  catch (err) {
-    console.log('Erro ocorreu:', err);
-    res.status(500).json({ error: err.message });
-  }
-});*/
 
 // adicionar nova vaga
 router.post('/vagas', async (req, res) => {
@@ -151,9 +134,9 @@ router.post('/administracao/cadastro', async (req, res) => {
 
 //login de empresa
 router.post('/empresas/login', async (req, res) => {
-  const { emailEmpresa, cnpj, senha } = req.body;
+  const {cnpj, senha } = req.body;
   try {
-    const [rows] = await db.query('SELECT * FROM empresas WHERE emailEmpresa = ? AND cnpj = ? AND senha = ?', [emailEmpresa, cnpj, senha]);
+    const [rows] = await db.query('SELECT * FROM empresas WHERE cnpj = ? AND senha = ?', [cnpj, senha]);
     if (rows.length > 0) {
       res.json({ message: 'Login realizado com sucesso!', empresa: rows[0] });
     } else {
