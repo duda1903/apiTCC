@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
+const bcrypt = require('bcrypt');
 const db = require('./db');
 
 // listar todas as vagas
@@ -46,13 +46,40 @@ router.delete('/vagas/:idVaga', async (req, res) => {
 });
 
 //cadastro estagiario
-router.post('/estagiario', async (req, res) => {
+/*router.post('/estagiario', async (req, res) => {
   const { nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, senha } = req.body;
   try {
     await db.query(
       'INSERT INTO estagiario (nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, senha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, senha]
     );
+    res.status(201).json({ message: 'Estagiário adicionado com sucesso!' });
+  } 
+  catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});*/
+
+const saltRounds = 10; // Define o número de rounds de salt
+
+router.post('/estagiario', async (req, res) => {
+  const { nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, senha } = req.body;
+
+  try {
+    // Gera o hash da senha
+    const hashedPassword = await bcrypt.hash(senha, saltRounds);
+
+    // Verifica se o hash foi criado antes de prosseguir
+    if (!hashedPassword) {
+      throw new Error('Erro ao gerar o hash da senha');
+    }
+
+    // Executa a query para inserir o estagiário com a senha criptografada
+    await db.query(
+      'INSERT INTO estagiario (nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, senha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, hashedPassword] // Usa o hashedPassword aqui
+    );
+
     res.status(201).json({ message: 'Estagiário adicionado com sucesso!' });
   } 
   catch (err) {
