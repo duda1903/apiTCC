@@ -7,6 +7,26 @@ const db = require('./db');
 const jwtSecret = process.env.JWT_SECRET;
 const saltRounds = 10;
 
+// Função middleware para verificar se o usuário é admin
+function verificarAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader) return res.status(403).json({ message: 'Token não fornecido' });
+  
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, jwtSecret, (err, decoded) => {
+      if (err) return res.status(403).json({ message: 'Token inválido' });
+
+      if (decoded.role !== 'admin') {
+          return res.status(403).json({ message: 'Acesso negado. Somente administradores podem acessar.' });
+      }
+
+      req.user = decoded; // Passa os dados do usuário adiante, caso necessário
+      next(); // Usuário autorizado, continua para a próxima função
+  });
+}
+
 // listar todas as vagas
 router.get('/vagas', async (req, res) => {
   try {
@@ -18,9 +38,9 @@ router.get('/vagas', async (req, res) => {
   }
 });
 
-// adicionar nova vaga
-router.post('/vagas', async (req, res) => {
-  const { titulo, descricao, requisitos,cidade, dataPublicacao, administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa,  idEmpresa, modalidade } = req.body;
+// adicionar nova vaga (somente para administradores)
+router.post('/vagas', verificarAdmin, async (req, res) => {
+  const { titulo, descricao, requisitos, cidade, dataPublicacao, administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa, idEmpresa, modalidade } = req.body;
   console.log('Dados recebidos:', req.body);
   try {
     await db.query(
@@ -170,11 +190,13 @@ router.post('/administracao/cadastro', async (req, res) => {
 
 router.post('/administracao/login', async (req, res) => {
   const { cpf, senha } = req.body;
+  console.log("CPF recebido:", cpf);
+  console.log("Senha recebida:", senha);
   try {
     const [rows] = await db.query(
       'SELECT * FROM administracao WHERE cpf = ?',
       [cpf]
-    );
+    );console.log("Resultados da busca no banco de dados:", rows);
     if (rows.length === 0) {
       return res.status(401).json({ error: 'CPF ou senha incorretos' });
     }
