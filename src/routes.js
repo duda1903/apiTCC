@@ -81,17 +81,27 @@ router.post('/estagiario', async (req, res) => {
       throw new Error('Erro ao gerar o hash da senha');
     }
 
-    const result = await db.query(
+    // Inserir o estagiário no banco de dados
+    const [result] = await db.query(
       'INSERT INTO estagiario (nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, senha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [nome, cidade, habilidades, formacaoAcademica, telefone, email, links, curso, hashedPassword]
     );
 
     const userId = result.insertId;
+
+    // Gerar o token JWT
     const token = jwt.sign(
       { id: userId, email },
       jwtSecret,
       { expiresIn: '1h' }
     );
+
+    // Atualizar o estagiário com o token gerado
+    await db.query(
+      'UPDATE estagiario SET token = ? WHERE idEstagiario = ?',
+      [token, userId]
+    );
+
     res.status(201).json({ message: 'Estagiário adicionado com sucesso!', token });
   } 
   catch (err) {
@@ -162,6 +172,54 @@ router.post('/estagiario/login', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Rota para buscar os dados do perfil do usuário logado
+router.get('/perfil', async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(403).json({ message: 'Token não fornecido' });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    // Verificar o token JWT e extrair os dados do usuário
+    const decoded = jwt.verify(token, jwtSecret);
+
+    // Buscar o usuário no banco de dados com base no papel (estagiário, admin ou empresa)
+    let query = '';
+    let params = [];
+
+    if (decoded.cpf) {
+      // Usuário é administrador
+      query = 'SELECT * FROM administracao WHERE idAdm = ?';
+      params = [decoded.id];
+    } else if (decoded.cnpj) {
+      // Usuário é uma empresa
+      query = 'SELECT * FROM empresas WHERE id = ?';
+      params = [decoded.id];
+    } else {
+      // Usuário é um estagiário
+      query = 'SELECT * FROM estagiario WHERE idEstagiario = ?';
+      params = [decoded.id];
+    }
+
+    // Executar a consulta no banco de dados
+    const [rows] = await db.query(query, params);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+
+    // Retornar os dados do perfil do usuário
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao buscar o perfil do usuário', error: err.message });
+  }
+});
+
 
 //cadastro de adm
 router.post('/administracao/cadastro', async (req, res) => {
