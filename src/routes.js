@@ -7,27 +7,7 @@ const db = require('./db');
 const jwtSecret = process.env.JWT_SECRET;
 const saltRounds = 10;
 
-// Função middleware para verificar se o usuário é admin
-function verificarAdmin(req, res, next) {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader) return res.status(403).json({ message: 'Token não fornecido' });
-  
-  const token = authHeader.split(" ")[1];
-
-  jwt.verify(token, jwtSecret, (err, decoded) => {
-      if (err) return res.status(403).json({ message: 'Token inválido' });
-
-      if (decoded.role !== 'admin') {
-          return res.status(403).json({ message: 'Acesso negado. Somente administradores podem acessar.' });
-      }
-
-      req.user = decoded; // Passa os dados do usuário adiante, caso necessário
-      next(); // Usuário autorizado, continua para a próxima função
-  });
-}
-
-// listar todas as vagas
+//lista as vagas
 router.get('/vagas', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM vagas');
@@ -38,8 +18,8 @@ router.get('/vagas', async (req, res) => {
   }
 });
 
-// adicionar nova vaga (somente para administradores)
-router.post('/vagas', verificarAdmin, async (req, res) => {
+//add vagas
+router.post('/vagas', async (req, res) => {
   const { titulo, descricao, requisitos, cidade, dataPublicacao, administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa, idEmpresa, modalidade } = req.body;
   console.log('Dados recebidos:', req.body);
   try {
@@ -89,14 +69,11 @@ router.post('/estagiario', async (req, res) => {
 
     const userId = result.insertId;
 
-    // Gerar o token JWT
     const token = jwt.sign(
       { id: userId, email },
       jwtSecret,
       { expiresIn: '1h' }
     );
-
-    // Atualizar o estagiário com o token gerado
     await db.query(
       'UPDATE estagiario SET token = ? WHERE idEstagiario = ?',
       [token, userId]
@@ -157,13 +134,13 @@ router.post('/estagiario/login', async (req, res) => {
       const estagiario = rows[0];
       const match = await bcrypt.compare(senha, estagiario.senha);
       if (match) {
-        res.json({ message: 'Login realizado com sucesso!', estagiario });
-      }
-      else {
+        // Gere o token JWT com uma validade de 1 hora
+        const token = jwt.sign({ id: estagiario.idEstagiario }, secretKey, { expiresIn: '1h' });
+        res.json({ message: 'Login realizado com sucesso!', token });
+      } else {
         res.status(401).json({ message: 'Dados inválidos' });
       }
-    }
-    else {
+    } else {
       res.status(401).json({ message: 'Dados inválidos' });
     }
   } 
@@ -231,12 +208,30 @@ router.post('/administracao/cadastro', async (req, res) => {
     if (!hashedPassword) {
       throw new Error('Erro ao gerar o hash da senha');
     }
-    await db.query(
+
+    // Inserir o administrador no banco de dados
+    const [result] = await db.query(
       'INSERT INTO administracao (email, nome, cpf, senha) VALUES (?, ?, ?, ?)',
       [email, nome, cpf, hashedPassword]
     );
+
+    const adminId = result.insertId;
+
+    // Gerar o token JWT
+    const token = jwt.sign(
+      { id: adminId, email },
+      jwtSecret,
+      { expiresIn: '1h' }
+    );
+
+    // Atualizar o administrador com o token gerado
+    await db.query(
+      'UPDATE administracao SET token = ? WHERE idAdm = ?',
+      [token, adminId]
+    );
+
     console.log('Administrador inserido com sucesso!');
-    res.status(201).json({ message: 'Administrador inserido com sucesso!' });
+    res.status(201).json({ message: 'Administrador inserido com sucesso!', token });
   } 
   catch (err) {
     console.log('Erro ocorreu:', err);
@@ -302,7 +297,7 @@ router.post('/empresas/login', async (req, res) => {
   }
 });
 
-//cadastro de empresa
+// Cadastro de empresa
 router.post('/empresas', async (req, res) => {
   const { nomeEmpresa, emailEmpresa, telEmpresa, cidade, descricao, cnpj, senha } = req.body;
   console.log('Dados recebidos:', req.body);
@@ -312,18 +307,37 @@ router.post('/empresas', async (req, res) => {
     if (!hashedPassword) {
       throw new Error('Erro ao gerar o hash da senha');
     }
-    await db.query(
+
+    // Inserir a empresa no banco de dados
+    const [result] = await db.query(
       'INSERT INTO empresas (nomeEmpresa, emailEmpresa, telEmpresa, cidade, descricao, cnpj, senha) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [nomeEmpresa, emailEmpresa, telEmpresa, cidade, descricao, cnpj, hashedPassword]
     );
+
+    const companyId = result.insertId;
+
+    // Gerar o token JWT
+    const token = jwt.sign(
+      { id: companyId, emailEmpresa },
+      jwtSecret,
+      { expiresIn: '1h' }
+    );
+
+    // Atualizar a empresa com o token gerado
+    await db.query(
+      'UPDATE empresas SET token = ? WHERE idEmpresa = ?',
+      [token, companyId]
+    );
+
     console.log('Empresa inserida com sucesso!');
-    res.status(201).json({ message: 'Empresa inserida com sucesso!' });
+    res.status(201).json({ message: 'Empresa inserida com sucesso!', token });
   } 
   catch (err) {
     console.log('Erro ocorreu:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // listar todas as empresas
 router.get('/empresas', async (req, res) => {
