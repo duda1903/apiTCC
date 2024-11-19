@@ -20,3 +20,8 @@ primary_region = 'gru'
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
+
+[[processes]]
+  name = "app"
+  command = "node src/index.js"
+  env = {}
