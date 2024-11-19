@@ -36,16 +36,45 @@ router.post('/vagas', async (req, res) => {
   }
 });
 
-
-//excluir vaga
+// Rota para excluir uma vaga
 router.delete('/vagas/:idVaga', async (req, res) => {
-  const idVaga = req.params.idVaga;
+  const { idVaga } = req.params;
+
   try {
-    await db.query('DELETE FROM vagas WHERE idVaga = ?', idVaga);
+    const [result] = await db.query('DELETE FROM vagas WHERE idVaga = ?', [idVaga]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Vaga não encontrada' });
+    }
+
     res.status(200).json({ message: 'Vaga excluída com sucesso!' });
-  } 
-  catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    console.error('Erro ao excluir vaga:', err);
+    res.status(500).json({ error: 'Erro ao excluir a vaga', details: err.message });
+  }
+});
+
+// Rota para alterar uma vaga
+router.put('/vagas/:idVaga', async (req, res) => {
+  const { idVaga } = req.params;
+  const { titulo, descricao, requisitos, cidade, dataPublicacao, administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa, idEmpresa, modalidade } = req.body;
+
+  try {
+    const [result] = await db.query(
+      `UPDATE vagas
+       SET titulo = ?, descricao = ?, requisitos = ?, cidade = ?, dataPublicacao = ?, administracao_idAdm = ?, nomeEmpresa = ?, emailEmpresa = ?, telEmpresa = ?, idEmpresa = ?, modalidade = ?
+       WHERE idVaga = ?`,
+      [titulo, descricao, requisitos, cidade, dataPublicacao, administracao_idAdm, nomeEmpresa, emailEmpresa, telEmpresa, idEmpresa, modalidade, idVaga]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Vaga não encontrada' });
+    }
+
+    res.status(200).json({ message: 'Vaga atualizada com sucesso!' });
+  } catch (err) {
+    console.error('Erro ao alterar vaga:', err);
+    res.status(500).json({ error: 'Erro ao alterar a vaga', details: err.message });
   }
 });
 
@@ -135,7 +164,7 @@ router.post('/estagiario/login', async (req, res) => {
       const match = await bcrypt.compare(senha, estagiario.senha);
       if (match) {
         // Gere o token JWT com uma validade de 1 hora
-        const token = jwt.sign({ id: estagiario.idEstagiario }, secretKey, { expiresIn: '1h' });
+        const token = jwt.sign({ id: estagiario.idEstagiario }, jwtSecret, { expiresIn: '1h' });
         res.json({ message: 'Login realizado com sucesso!', token });
       } else {
         res.status(401).json({ message: 'Dados inválidos' });
@@ -194,7 +223,7 @@ router.get('/perfil', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao buscar o perfil do usuário', error: err.message });
-  }
+  } 
 });
 
 
@@ -339,16 +368,17 @@ router.post('/empresas', async (req, res) => {
 });
 
 
-// listar todas as empresas
+// Rota para listar todas as empresas
 router.get('/empresas', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM empresas');
     res.json(rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error('Erro ao buscar empresas:', err);
+    res.status(500).json({ error: 'Erro ao buscar as empresas', details: err.message });
   }
 });
+
 
 
 module.exports = router;
